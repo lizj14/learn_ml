@@ -7,6 +7,11 @@ NUM_CHANNELS = 1
 PIXEL_DEPTH = 255
 VALIDATION_SIZE = 5000
 BATCH_SIZE = 64
+EVAL_BATCH = 64
+NUM_LABELS = 10
+
+def data_type():
+    return np.float64
 
 def extract_data(file_name, num_images):
     print('extract %s' % file_name)
@@ -14,7 +19,7 @@ def extract_data(file_name, num_images):
         bytestream.read(16)
         buf = bytestream.read(IMAGE_SIZE*IMAGE_SIZE*num_images*NUM_CHANNELS)
         # test as float64
-        data = np.frombuffer(buf, dtype=np.uint8).astype(np.float64)
+        data = np.frombuffer(buf, dtype=np.uint8).astype(data_type())
         data = (data-(PIXEL_DEPTH/2.0)) / PIXEL_DEPTH
         data = data.reshape(num_images, IMAGE_SIZE, IMAGE_SIZE, NUM_CHANNELS)
         return data
@@ -50,12 +55,32 @@ def main(_):
 
     train_size = train_label.shape[0]
 
-    input_data = tf.placeholder(tf.float64,
+    input_data = tf.placeholder(data_type(),
             shape=(BATCH_SIZE, IMAGE_SIZE, IMAGE_SIZE, NUM_CHANNELS))
     input_lable = tf.placeholder(tf.int64,
             shape=(BATCH_SIZE))
-    eval_data = tf.placeholder(tf.float64,
+    eval_data = tf.placeholder(data_type(),
             shape=(EVAL_BATCH, IMAGE_SIZE, IMAGE_SIZE, NUM_CHANNELS))
+
+    conv1_weights = tf.Variable(tf.truncated_normal([5, 5, NUM_CHANNELS, 32],
+        stddev=0.1, dtype=data_type()))
+    conv1_bias = tf.Variable(tf.zeros([32], dtype=data_type()))
+    fc1_weights = tf.Variable(tf.truncated_normal([IMAGE_SIZE * IMAGE_SIZE // 4 * 32, NUM_LABELS], stddev=0.1, dtype = data_type()))
+    fc1_bias = tf.Variable(tf.zeros([NUM_LABELS], dtype=data_type()))
+
+    def model(data, train=False):
+        conv1 = tf.nn.conv2d(data, conv1_weights, 
+                strides=[1, 1, 1, 1],
+                padding='SAME')
+        relu = tf.nn.relu(tf.nn.bias_add(conv1, conv1_bias))
+        pool1 = tf.nn.max_pool(relu, 
+                ksize = [1,2,2,1],
+                strides=[1,2,2,1],
+                padding='SAME')
+        pool_shape = pool.get_shape().as_list()
+        reshape = tf.reshape(pool,
+                [pool_shape[0], pool_shape[1]*pool_shape[2]*pool_shape[3]])
+        return tf.matmul(reshape, fc1_weights) + fc1_bias
 
 if __name__ == '__main__':
     tf.app.run(main=main)
