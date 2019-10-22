@@ -68,8 +68,13 @@ def main(_):
     conv1_weights = tf.Variable(tf.truncated_normal([5, 5, NUM_CHANNELS, 32],
         stddev=0.1, dtype=data_type()))
     conv1_bias = tf.Variable(tf.zeros([32], dtype=data_type()))
-    fc1_weights = tf.Variable(tf.truncated_normal([IMAGE_SIZE * IMAGE_SIZE // 4 * 32, NUM_LABELS], stddev=0.1, dtype = data_type()))
-    fc1_bias = tf.Variable(tf.zeros([NUM_LABELS], dtype=data_type()))
+    conv2_weights = tf.Variable(tf.truncated_normal([5, 5, 32, 64],
+        stddev=0.1, dtype=data_type()))
+    conv2_bias = tf.Variable(tf.zeros([64], dtype=data_type()))
+    fc1_weights = tf.Variable(tf.truncated_normal([IMAGE_SIZE * IMAGE_SIZE // 4 // 4* 64, 512], stddev=0.1, dtype = data_type()))
+    fc1_bias = tf.Variable(tf.zeros([512], dtype=data_type()))
+    fc2_bias = tf.Variable(tf.zeros([NUM_LABELS], dtype=data_type()))
+    fc2_weights = tf.Variable(tf.truncated_normal([512, NUM_LABELS], stddev=0.1, dtype=data_type()))
 
     def model(data, train=False):
         conv1 = tf.nn.conv2d(data, conv1_weights, 
@@ -80,10 +85,22 @@ def main(_):
                 ksize = [1,2,2,1],
                 strides=[1,2,2,1],
                 padding='SAME')
-        pool_shape = pool1.get_shape().as_list()
-        reshape = tf.reshape(pool1,
+        conv2 = tf.nn.conv2d(pool1, conv2_weights,
+                strides=[1, 1, 1, 1],
+                padding='SAME')
+        relu = tf.nn.relu(tf.nn.bias_add(conv2, conv2_bias))
+        pool2 = tf.nn.max_pool(relu,
+                ksize = [1,2,2,1],
+                strides = [1,2,2,1],
+                padding = 'SAME')
+        pool_shape = pool2.get_shape().as_list()
+        reshape = tf.reshape(pool2,
                 [pool_shape[0], pool_shape[1]*pool_shape[2]*pool_shape[3]])
-        return tf.matmul(reshape, fc1_weights) + fc1_bias
+        hidden = tf.matmul(reshape, fc1_weights) + fc1_bias
+        hidden = tf.nn.relu(hidden)
+        if train:
+            hidden = tf.nn.dropout(hidden, 0.5)
+        return tf.matmul(hidden, fc2_weights) + fc2_bias
 
     logits = model(input_data_node, True)
     loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(
