@@ -7,6 +7,7 @@ class Model:
                 kwargs['valid'])
         self.iterations = int(kwargs['iter']) if 'iter' in kwargs.keys() else 5
         self.init = False
+        self.data_set = None 
 
     def init_model(self, **kwargs):
         self.init = True
@@ -23,6 +24,7 @@ class Model:
         return clf_precision(result, label)
 
     def work(self, data_set):
+        self.data_set = data_set
         data = data_set.train_data()
         # np.shuffle(data)
         test_data = data_set.test_data()
@@ -32,8 +34,9 @@ class Model:
 
         # train_data.drop(['random'], axis=1)
         # valid_data.drop(['random'], axis=1)
-        set_exclude = set(['random', data_set.label])
-        features = [ f for f in train_data.columns if not f in set_exclude ] 
+        # set_exclude = set(['random', data_set.label])
+        # features = [ f for f in train_data.columns if not f in set_exclude ] 
+        features = self.data_set.feature_list(train_data.columns)
         for i in range(0, self.iterations):
             # np.shuffle(train_data)
             train_ratio = self.train(
